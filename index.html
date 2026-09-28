@@ -975,6 +975,12 @@ window.SPELLS = [{"canonicalId":"agrandissement-rapetissement","name":"Agrandiss
     return bouts.join(' · ');
   }
 
+  // Un seul sort déplié à la fois. On retient la carte ouverte pour la
+  // refermer quand on en ouvre une autre : sans ça, on finit avec dix
+  // descriptions dépliées et on fait défiler à l'aveugle pour retrouver la
+  // suivante — particulièrement pénible au doigt.
+  var carteOuverte = null;
+
   function carte(s) {
     var art = el('article', 'sort ec-' + s.school);
 
@@ -1077,9 +1083,24 @@ window.SPELLS = [{"canonicalId":"agrandissement-rapetissement","name":"Agrandiss
 
     art.remplirCorps = remplirCorps;
 
+    function replier() {
+      tete.setAttribute('aria-expanded', 'false');
+      corps.hidden = true;
+      art.classList.remove('ouvert');
+    }
+    art.replier = replier;
+
     tete.addEventListener('click', function () {
       var ouvert = tete.getAttribute('aria-expanded') === 'true';
-      if (!ouvert) remplirCorps();
+      if (!ouvert) {
+        if (carteOuverte && carteOuverte !== art && carteOuverte.replier) {
+          carteOuverte.replier();
+        }
+        remplirCorps();
+        carteOuverte = art;
+      } else {
+        carteOuverte = null;
+      }
       tete.setAttribute('aria-expanded', ouvert ? 'false' : 'true');
       corps.hidden = ouvert;
       art.classList.toggle('ouvert', !ouvert);
@@ -1399,6 +1420,9 @@ window.SPELLS = [{"canonicalId":"agrandissement-rapetissement","name":"Agrandiss
   }
 
   function rendre() {
+    // La liste est reconstruite entierement : l'ancienne carte ouverte
+    // n'appartient plus au document.
+    carteOuverte = null;
     construireFiltres();
     majOnglets();
     majBarre();

@@ -9,7 +9,7 @@
  * continueront d'afficher l'ancienne version, indéfiniment.
  */
 
-var VERSION = 'sorts-dnd-v1';
+var VERSION = 'sorts-dnd-v2';
 
 var FICHIERS = [
   './',

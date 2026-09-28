@@ -25,7 +25,20 @@ var FICHIERS = [
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(VERSION).then(function (cache) {
-      return cache.addAll(FICHIERS);
+      // Volontairement PAS cache.addAll() : cette méthode est tout-ou-rien.
+      // Si un seul fichier manque sur le serveur, elle rejette en bloc,
+      // l'installation échoue et le cache reste vide — panne silencieuse et
+      // définitive. C'est exactement ce qui casse le hors ligne de dd2024.fr,
+      // dont la liste contient /favicon.png qui renvoie 404. Ici chaque
+      // fichier est mis en cache pour son compte : un absent ne coûte que lui.
+      return Promise.all(FICHIERS.map(function (url) {
+        return fetch(url, { cache: 'reload' }).then(function (reponse) {
+          if (!reponse.ok) throw new Error(url + ' → HTTP ' + reponse.status);
+          return cache.put(url, reponse);
+        }).catch(function (err) {
+          console.warn('[sw] fichier non mis en cache :', err.message);
+        });
+      }));
     }).then(function () {
       return self.skipWaiting();
     })

@@ -587,6 +587,52 @@
   @media (prefers-reduced-motion: reduce) {
     * { scroll-behavior: auto !important; transition: none !important; }
   }
+  /* Impression de « Mes sorts » : deux colonnes serrées pour économiser le papier. */
+  #impression { display: none; }
+
+  @media print {
+    @page { margin: 8mm; }
+    body.imprime-selection { background: #fff !important; color: #000 !important; }
+    body.imprime-selection > :not(#impression) { display: none !important; }
+    body.imprime-selection #impression {
+      display: block;
+      column-count: 2;
+      column-gap: 7mm;
+      column-rule: .5pt solid #bbb;
+      font: 8.5pt/1.25 Arial, Helvetica, sans-serif;
+    }
+    #impression, #impression * { color: #000 !important; background: none !important; }
+    #impression h1 { column-span: all; font-size: 11pt; margin: 0 0 3mm; }
+    #impression h2.imp-groupe {
+      font-size: 10pt;
+      margin: 3pt 0 2pt;
+      border-bottom: .75pt solid #000;
+      break-after: avoid;
+    }
+    #impression h3 { display: inline; font-size: 9.5pt; margin: 0; }
+    #impression .imp-etiq {
+      font-size: 6.5pt;
+      font-weight: normal;
+      border: .5pt solid #000;
+      border-radius: 2pt;
+      padding: 0 2pt;
+      margin-left: 3pt;
+      vertical-align: middle;
+    }
+    #impression .imp-sous { font-style: italic; font-size: 7.5pt; margin: 0; }
+    #impression dl.fiche { font-size: 7.5pt; margin: 1pt 0; }
+    #impression dl.fiche dt, #impression dl.fiche dd { display: inline; margin: 0; }
+    #impression dl.fiche dt { font-weight: bold; }
+    #impression dl.fiche dt::after { content: " : "; }
+    #impression dl.fiche dd:not(:last-child)::after { content: " · "; }
+    #impression .description p { margin: 2pt 0; }
+    #impression .classes { font-size: 6.5pt; color: #333 !important; }
+    #impression .imp-sort {
+      padding: 2pt 0 3pt;
+      border-bottom: .3pt solid #999;
+      break-inside: auto;
+    }
+  }
 </style>
 </head>
 <body>
@@ -611,6 +657,8 @@
   <div class="liste" id="liste"></div>
   <p class="vide" id="vide" hidden>Aucun sort ne correspond à ces critères.</p>
 </main>
+
+<div id="impression" aria-hidden="true"></div>
 
 <button id="haut" type="button" aria-label="Revenir en haut de la liste">↑</button>
 
@@ -975,6 +1023,56 @@ window.SPELLS = [{"canonicalId":"agrandissement-rapetissement","name":"Agrandiss
     return bouts.join(' · ');
   }
 
+  // Détail complet d'un sort (fiche, description, classes), partagé entre
+  // la carte dépliée à l'écran et la feuille d'impression.
+  function construireDetails(s, corps) {
+    var fiche = el('dl', 'fiche');
+    function ligne(cle, valeur) {
+      if (!valeur) return;
+      fiche.appendChild(el('dt', null, cle));
+      fiche.appendChild(el('dd', null, valeur));
+    }
+    ligne('Incantation', s.castingTime);
+    ligne('Portée', s.range);
+    ligne('Durée', s.duration);
+    var comp = s._comp.join(', ');
+    if (s.components && s.components.materialText) {
+      comp += ' (' + s.components.materialText + ')';
+    }
+    ligne('Composantes', comp || '—');
+    corps.appendChild(fiche);
+
+    var desc = el('div', 'description');
+    String(s.description || '').split(/\n{2,}/).forEach(function (para) {
+      // Un seul sort du lot emploie **gras** ; on le rend au lieu de
+      // laisser les astérisques à l'écran.
+      var p = el('p');
+      para.split(/(\*\*[^*]+\*\*)/).forEach(function (bout) {
+        if (/^\*\*[^*]+\*\*$/.test(bout)) {
+          p.appendChild(el('strong', null, bout.slice(2, -2)));
+        } else if (bout) {
+          bout.split('\n').forEach(function (l, k) {
+            if (k) p.appendChild(document.createElement('br'));
+            p.appendChild(document.createTextNode(l));
+          });
+        }
+      });
+      desc.appendChild(p);
+    });
+    corps.appendChild(desc);
+
+    if (s.summonedMonsters && s.summonedMonsters.length) {
+      corps.appendChild(el('div', 'classes',
+        'Créatures invoquées : ' + s.summonedMonsters.join(', ')));
+    }
+
+    var cl = (s.classes || []).map(function (c) { return CLASSES[c] || c; }).sort(function (a, b) {
+      return a.localeCompare(b, 'fr');
+    });
+    corps.appendChild(el('div', 'classes',
+      (cl.length ? 'Classes : ' + cl.join(', ') : 'Aucune classe listée') + ' — ' + s.source));
+  }
+
   // Un seul sort déplié à la fois. On retient la carte ouverte pour la
   // refermer quand on en ouvre une autre : sans ça, on finit avec dix
   // descriptions dépliées et on fait défiler à l'aveugle pour retrouver la
@@ -1034,51 +1132,7 @@ window.SPELLS = [{"canonicalId":"agrandissement-rapetissement","name":"Agrandiss
       if (rempli) return;
       rempli = true;
 
-      var fiche = el('dl', 'fiche');
-      function ligne(cle, valeur) {
-        if (!valeur) return;
-        fiche.appendChild(el('dt', null, cle));
-        fiche.appendChild(el('dd', null, valeur));
-      }
-      ligne('Incantation', s.castingTime);
-      ligne('Portée', s.range);
-      ligne('Durée', s.duration);
-      var comp = s._comp.join(', ');
-      if (s.components && s.components.materialText) {
-        comp += ' (' + s.components.materialText + ')';
-      }
-      ligne('Composantes', comp || '—');
-      corps.appendChild(fiche);
-
-      var desc = el('div', 'description');
-      String(s.description || '').split(/\n{2,}/).forEach(function (para) {
-        // Un seul sort du lot emploie **gras** ; on le rend au lieu de
-        // laisser les astérisques à l'écran.
-        var p = el('p');
-        para.split(/(\*\*[^*]+\*\*)/).forEach(function (bout) {
-          if (/^\*\*[^*]+\*\*$/.test(bout)) {
-            p.appendChild(el('strong', null, bout.slice(2, -2)));
-          } else if (bout) {
-            bout.split('\n').forEach(function (l, k) {
-              if (k) p.appendChild(document.createElement('br'));
-              p.appendChild(document.createTextNode(l));
-            });
-          }
-        });
-        desc.appendChild(p);
-      });
-      corps.appendChild(desc);
-
-      if (s.summonedMonsters && s.summonedMonsters.length) {
-        corps.appendChild(el('div', 'classes',
-          'Créatures invoquées : ' + s.summonedMonsters.join(', ')));
-      }
-
-      var cl = (s.classes || []).map(function (c) { return CLASSES[c] || c; }).sort(function (a, b) {
-        return a.localeCompare(b, 'fr');
-      });
-      corps.appendChild(el('div', 'classes',
-        (cl.length ? 'Classes : ' + cl.join(', ') : 'Aucune classe listée') + ' — ' + s.source));
+      construireDetails(s, corps);
     }
 
     art.remplirCorps = remplirCorps;
@@ -1210,6 +1264,8 @@ window.SPELLS = [{"canonicalId":"agrandissement-rapetissement","name":"Agrandiss
     actions.appendChild(exporter);
 
     actions.appendChild(bouton('⇩ Importer', function () { ouvrirPanneau('import'); }));
+
+    if (selection.length) actions.appendChild(bouton('🖨 Imprimer', imprimerSelection));
 
     if (selection.length) {
       actions.appendChild(bouton('✕ Vider ma liste', function () {
@@ -1475,6 +1531,57 @@ window.SPELLS = [{"canonicalId":"agrandissement-rapetissement","name":"Agrandiss
       vide.textContent = 'Aucun sort ne correspond à ces critères.';
     }
     vide.hidden = trouves.length > 0;
+  }
+
+  // ------------------------------------------------------------- impression
+  // Feuille compacte de toute la liste « Mes sorts », détail compris, sans
+  // tenir compte des filtres ni de la recherche en cours.
+
+  var zoneImpression = document.getElementById('impression');
+
+  function imprimerSelection() {
+    if (!selection.length) return;
+
+    // Sans recherche, trier() garde le classement choisi au lieu de la
+    // pertinence par rapport au texte tapé.
+    var q = etat.q;
+    etat.q = '';
+    var sorts = trier(SORTS.filter(estChoisi));
+    etat.q = q;
+
+    zoneImpression.textContent = '';
+    zoneImpression.appendChild(el('h1', null, 'Mes sorts D&D 5e — ' + sorts.length +
+      (sorts.length > 1 ? ' sorts' : ' sort')));
+
+    var precedent = null;
+    sorts.forEach(function (s) {
+      var k = cleGroupe(s);
+      if (k && k !== precedent) zoneImpression.appendChild(el('h2', 'imp-groupe', k));
+      precedent = k;
+
+      var bloc = el('section', 'imp-sort');
+      var h = el('h3', null, s.name);
+      if (s.concentration) h.appendChild(el('span', 'imp-etiq', 'Concentration'));
+      if (s.ritual) h.appendChild(el('span', 'imp-etiq', 'Rituel'));
+      bloc.appendChild(h);
+      bloc.appendChild(el('p', 'imp-sous', ligneSousTitre(s)));
+      construireDetails(s, bloc);
+      zoneImpression.appendChild(bloc);
+    });
+
+    function apres() {
+      document.body.classList.remove('imprime-selection');
+      zoneImpression.textContent = '';
+      window.removeEventListener('afterprint', apres);
+    }
+    document.body.classList.add('imprime-selection');
+    window.addEventListener('afterprint', apres);
+    try {
+      window.print();
+    } catch (e) {
+      apres();
+      window.alert('Impression impossible sur cet appareil.');
+    }
   }
 
   // ------------------------------------------------------------- interactions

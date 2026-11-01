@@ -1265,8 +1265,6 @@ window.SPELLS = [{"canonicalId":"agrandissement-rapetissement","name":"Agrandiss
 
     actions.appendChild(bouton('⇩ Importer', function () { ouvrirPanneau('import'); }));
 
-    if (selection.length) actions.appendChild(bouton('🖨 Imprimer', imprimerSelection));
-
     if (selection.length) {
       actions.appendChild(bouton('✕ Vider ma liste', function () {
         if (!window.confirm('Retirer les ' + selection.length + ' sorts de votre liste ?')) return;
@@ -1359,7 +1357,7 @@ window.SPELLS = [{"canonicalId":"agrandissement-rapetissement","name":"Agrandiss
   function construireExport() {
     panneau.appendChild(el('p', null,
       'Ce code contient vos ' + selection.length + ' sorts. Copiez-le (ou enregistrez le fichier), ' +
-      'puis collez-le dans « Importer » sur l’autre appareil.'));
+      'puis collez-le dans « Importer » sur l’autre appareil. Vous pouvez aussi les imprimer.'));
 
     var zone = document.createElement('textarea');
     zone.readOnly = true;
@@ -1388,6 +1386,8 @@ window.SPELLS = [{"canonicalId":"agrandissement-rapetissement","name":"Agrandiss
         msg.textContent = 'Enregistrement impossible ici : copiez le code à la place.';
       }
     }));
+
+    boutons.appendChild(bouton('🖨 Imprimer', imprimerSelection));
 
     boutons.appendChild(bouton('Fermer', fermerPanneau, 'fermer'));
     panneau.appendChild(boutons);
